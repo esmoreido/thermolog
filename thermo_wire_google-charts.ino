@@ -3,8 +3,10 @@
 #include <DallasTemperature.h>
 
 // Replace with your network credentials
-const char* ssid = "EsmoFi";
-const char* password = "aa4bb3cc2";
+//const char* ssid = "WSHYDRO";
+//const char* password = "d7f4r5aes";
+const char* ssid = "MOSNET15022";
+const char* password = "655dtv22";
 
 WiFiServer server(80);
 
@@ -15,10 +17,18 @@ WiFiServer server(80);
 OneWire oneWire(ONE_WIRE_BUS);
 // Pass our oneWire reference to Dallas Temperature sensor
 DallasTemperature sensors(&oneWire);
-byte sensaddr[3][8] = {
-  { 0x28, 0xD6, 0xD, 0x79, 0x97, 0x13, 0x3, 0xB6 },
-  { 0x28, 0xBB, 0x19, 0x79, 0x97, 0x11, 0x3, 0xCD },
-  { 0x28, 0xC9, 0x23, 0x79, 0x97, 0x9, 0x3, 0x98 }
+// put your DS18B20 sensor addresses here. sensaddr first subscript determines the number of addresses (10 now)
+byte sensaddr[10][8] = {
+     { 0x28, 0xC9, 0x23, 0x79, 0x97, 0x9, 0x3, 0x98 },
+    { 0x28, 0xE9, 0x76, 0x79, 0x97, 0x13, 0x3, 0x62 },
+    { 0x28, 0x27, 0x80, 0x79, 0x97, 0x11, 0x3, 0x45 },
+    { 0x28, 0x19, 0x62, 0x79, 0x97, 0x11, 0x3, 0xE2 },
+    { 0x28, 0x97, 0xE7, 0x79, 0x97, 0x11, 0x3, 0x2 },
+    { 0x28, 0x11, 0x5F, 0x79, 0x97, 0x9, 0x3, 0xB1 },
+    { 0x28, 0x81, 0x4A, 0x79, 0x97, 0x13, 0x3, 0xA5 },
+    { 0x28, 0xB6, 0xD3, 0x79, 0x97, 0x13, 0x3, 0x89 },
+    { 0x28, 0x80, 0x44, 0x79, 0x97, 0x11, 0x3, 0xA1 },
+    { 0x28, 0xBC, 0xCC, 0x79, 0x97, 0x13, 0x3, 0x55 }
 };
 
 // Client variables
@@ -81,6 +91,7 @@ void loop(void)
         // so you can send a reply
         // send a standard http response header
         sensors.requestTemperatures();
+        int n = sizeof(sensaddr) / sizeof(sensaddr[0]);
         client.println("HTTP/1.1 200 OK");
         client.println("Content-Type: text/html");
         client.println("Connection: close"); // the connection will be closed after completion of the response
@@ -89,23 +100,33 @@ void loop(void)
         client.println("<meta http-equiv=\"refresh\" content=\"2\">");
         client.println("<script type=\"text/javascript\" src=\"https://www.gstatic.com/charts/loader.js\"></script>");
         client.println("<script type=\"text/javascript\">");
-        client.println("google.charts.load('current', {'packages':['corechart']});");
-        client.println("google.charts.setOnLoadCallback(drawChart);");
+        client.println("google.load('visualization', '1.0', {'packages': ['corechart']});");
+        client.println("google.setOnLoadCallback(drawChart);");
         client.println("function drawChart() {");
-        client.println("var data = google.visualization.arrayToDataTable([");
-        client.println("['Dist','Temp'],");
-        for (int i = 0; i < 3; i++) {
-          char t[20];
-          sprintf(t, "[%d, %f],", i, sensors.getTempC(sensaddr[i]));
-          client.print(t);
-        }
+        
+        client.println("var data = new google.visualization.DataTable();");
+        client.println("data.addColumn('number', 'Dist');");
+        client.println("data.addColumn('number', 'Temp');");
+        client.println("data.addColumn({type:'number', role:'annotation'});");
+        client.println("data.addRows([");
+        for (int i = 0; i < 10; i++) {
+                char t[35];
+//                  float tempread = sensors.getTempC(sensaddr[i]);
+                  sprintf(t, "[%d, %f, %f ],", i, sensors.getTempC(sensaddr[i]), sensors.getTempC(sensaddr[i]) );
+                  client.print(t);
+                };
         client.println("]);");
-        client.println("var options = { title: 'Temp profile', curveType: 'function', legend: { position: 'bottom' }, vAxis: {viewWindow: {min: 0,max: 30}}};");
+        client.println("var options = { ");
+        client.println("'title': 'Thermowire', ");
+        client.println("hAxis: { gridlines: { count: 8 } },");
+        client.println("lineWidth: 3, curveType: 'function', legend: { position: 'top' }, pointSize: 5");
+        client.println("};");
         client.println("var chart = new google.visualization.LineChart(document.getElementById('curve_chart'));");
-        client.println("chart.draw(data, options)}</script>");
+        client.println("chart.draw(data, options);}");
+        client.println("</script>");
         client.println("</head>");
         client.println("<body><h2><p>ESP32 DS18B20</h2><p>");
-        client.println("<div id=\"curve_chart\" style=\"width: 500px; height: 300px\"></div>");
+        client.println("<div id=\"curve_chart\" style=\"width: 1000px; height: 500px\"></div>");
         client.println("</body></html>");
         // give the web browser time to receive the data
         delay(1);
